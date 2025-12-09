@@ -1,0 +1,12 @@
+現在の仕様であるタイマー機能を廃止して、実際のディベートと同じターン制にしたいです。
+以下のような実際のディベートと同じ流れ、内容を経験できるアプリにしたいです。
+
+// DEBATE_STRUCTUREの定義
+const DEBATE_STRUCTURE = [
+    { turn: 1, phase: '導入', speaker: 'AI', role: '主張の提示', time: 90 },
+    { turn: 2, phase: '導入', speaker: 'ユーザー', role: '主張の提示とAI主張への簡単な言及', time: 90 },
+    { turn: 3, phase: '反駁', speaker: 'AI', role: 'ユーザー主張への反論', time: 90 },
+    { turn: 4, phase: '反駁', speaker: 'ユーザー', role: 'AI主張への反論と自らの根拠の補強', time: 90 },
+    { turn: 5, phase: '最終まとめ', speaker: 'AI', role: '議論全体の要約と結び', time: 60 },
+    { turn: 6, phase: '最終まとめ', speaker: 'ユーザー', role: '議論全体の要約と勝利主張', time: 60 }
+];
