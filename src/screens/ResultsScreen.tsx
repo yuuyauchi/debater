@@ -14,6 +14,7 @@ import { CHARACTERS, TOPICS } from '../data/mockData';
 import { getEvaluationAndFeedback, EvaluationResult, EvaluationAndFeedbackResult } from '../services/MastraApiService';
 import { RadarChart } from '../components/RadarChart';
 import { useUser } from '../context/UserContext';
+import { getScoreCriteria, generateOverallEvaluation, SCORE_CRITERIA } from '../utils/scoringLogic';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -125,6 +126,10 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
   const lowScoreFeedback = result.feedback.filter((f) => f.score < 60);
   const highScoreFeedback = result.feedback.filter((f) => f.score >= 80);
 
+  // 総合評価基準を取得
+  const scoreCriteria = getScoreCriteria(result.overallScore);
+  const overallEvaluation = generateOverallEvaluation(result.overallScore);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -148,6 +153,40 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
           <Text style={styles.overallScoreValue}>{result.overallScore}</Text>
           <Text style={styles.overallScoreMax}>/ 100</Text>
         </View>
+
+        {/* 評価レベル表示 */}
+        {scoreCriteria && (
+          <View style={styles.criteriaContainer}>
+            <View style={styles.criteriaHeader}>
+              <Text style={styles.criteriaTitle}>📊 あなたのレベル</Text>
+              <View style={styles.levelBadge}>
+                <Text style={styles.levelBadgeText}>{scoreCriteria.title}</Text>
+              </View>
+            </View>
+
+            <View style={styles.criteriaSection}>
+              <Text style={styles.criteriaSectionTitle}>特徴</Text>
+              {scoreCriteria.characteristics.map((char, index) => (
+                <View key={index} style={styles.criteriaItem}>
+                  <Text style={styles.criteriaBullet}>•</Text>
+                  <Text style={styles.criteriaText}>{char}</Text>
+                </View>
+              ))}
+            </View>
+
+            {scoreCriteria.improvementAreas && scoreCriteria.improvementAreas.length > 0 && (
+              <View style={styles.criteriaSection}>
+                <Text style={styles.criteriaSectionTitle}>次のステップ</Text>
+                {scoreCriteria.improvementAreas.map((area, index) => (
+                  <View key={index} style={styles.criteriaItem}>
+                    <Text style={styles.criteriaBullet}>→</Text>
+                    <Text style={styles.criteriaText}>{area}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* AI分析バッジ */}
         <View style={styles.aiBadge}>
@@ -221,15 +260,60 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
         </TouchableOpacity>
 
         {showDetails && (
-          <View style={styles.detailsContainer}>
-            <Text style={styles.detailsTitle}>あなたの発言 ({messages.length}件)</Text>
-            {messages.map((msg, index) => (
-              <View key={index} style={styles.messageItem}>
-                <Text style={styles.messageNumber}>#{index + 1}</Text>
-                <Text style={styles.messageContent}>{msg}</Text>
-              </View>
-            ))}
-          </View>
+          <>
+            {/* 評価基準一覧 */}
+            <View style={styles.detailsContainer}>
+              <Text style={styles.detailsTitle}>📋 評価基準一覧</Text>
+              <Text style={styles.detailsSubtitle}>
+                各点数帯の詳細な評価基準をご確認いただけます
+              </Text>
+              {SCORE_CRITERIA.map((criteria, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.criteriaDetailItem,
+                    scoreCriteria?.range === criteria.range && styles.criteriaDetailItemActive,
+                  ]}
+                >
+                  <View style={styles.criteriaDetailHeader}>
+                    <Text style={styles.criteriaDetailRange}>{criteria.range}点</Text>
+                    <Text
+                      style={[
+                        styles.criteriaDetailTitle,
+                        scoreCriteria?.range === criteria.range && styles.criteriaDetailTitleActive,
+                      ]}
+                    >
+                      {criteria.title}
+                    </Text>
+                    {scoreCriteria?.range === criteria.range && (
+                      <View style={styles.currentLevelBadge}>
+                        <Text style={styles.currentLevelBadgeText}>現在</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.criteriaDetailBody}>
+                    {criteria.characteristics.map((char, charIndex) => (
+                      <View key={charIndex} style={styles.criteriaDetailPoint}>
+                        <Text style={styles.criteriaDetailBullet}>•</Text>
+                        <Text style={styles.criteriaDetailText}>{char}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* あなたの発言 */}
+            <View style={styles.detailsContainer}>
+              <Text style={styles.detailsTitle}>あなたの発言 ({messages.length}件)</Text>
+              {messages.map((msg, index) => (
+                <View key={index} style={styles.messageItem}>
+                  <Text style={styles.messageNumber}>#{index + 1}</Text>
+                  <Text style={styles.messageContent}>{msg}</Text>
+                </View>
+              ))}
+            </View>
+          </>
         )}
 
         {/* アクションボタン */}
@@ -546,6 +630,136 @@ const styles = StyleSheet.create({
     color: '#7F8C8D',
     fontSize: 16,
     fontWeight: '600',
+  },
+  criteriaContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  criteriaHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  criteriaTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  levelBadge: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  levelBadgeText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1976D2',
+  },
+  criteriaSection: {
+    marginBottom: 15,
+  },
+  criteriaSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#5D6D7E',
+    marginBottom: 10,
+  },
+  criteriaItem: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    paddingLeft: 5,
+  },
+  criteriaBullet: {
+    fontSize: 14,
+    color: '#4A90D9',
+    marginRight: 10,
+    fontWeight: 'bold',
+  },
+  criteriaText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#5D6D7E',
+    lineHeight: 20,
+  },
+  detailsSubtitle: {
+    fontSize: 13,
+    color: '#7F8C8D',
+    marginBottom: 15,
+    marginTop: -5,
+  },
+  criteriaDetailItem: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  criteriaDetailItemActive: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#4A90D9',
+  },
+  criteriaDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 8,
+  },
+  criteriaDetailRange: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#4A90D9',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  criteriaDetailTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    flex: 1,
+  },
+  criteriaDetailTitleActive: {
+    color: '#1976D2',
+  },
+  currentLevelBadge: {
+    backgroundColor: '#4A90D9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  currentLevelBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  criteriaDetailBody: {
+    paddingLeft: 5,
+  },
+  criteriaDetailPoint: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  criteriaDetailBullet: {
+    fontSize: 13,
+    color: '#7F8C8D',
+    marginRight: 8,
+  },
+  criteriaDetailText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#5D6D7E',
+    lineHeight: 19,
   },
 });
 

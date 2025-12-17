@@ -23,6 +23,126 @@ export interface FeedbackItem {
   suggestion?: string;
 }
 
+// 点数帯別の評価基準
+export interface ScoreRangeCriteria {
+  range: string;
+  minScore: number;
+  maxScore: number;
+  title: string;
+  characteristics: string[];
+  improvementAreas?: string[];
+}
+
+// 点数帯別の評価基準定義
+export const SCORE_CRITERIA: ScoreRangeCriteria[] = [
+  {
+    range: '50-60',
+    minScore: 50,
+    maxScore: 60,
+    title: '基礎レベル',
+    characteristics: [
+      '基本的な論点は提示できている',
+      '論理的な繋がりが弱い',
+      '反論が不十分',
+    ],
+    improvementAreas: [
+      '論点間の論理的な繋がりを強化する',
+      'より効果的な反論の組み立てを学ぶ',
+      '主張の根拠を明確にする',
+    ],
+  },
+  {
+    range: '60-70',
+    minScore: 60,
+    maxScore: 70,
+    title: '中級レベル',
+    characteristics: [
+      '論点が明確で構造化されている',
+      '論理的な展開ができている',
+      '反論に一定の説得力がある',
+      '根拠が不足している部分がある',
+    ],
+    improvementAreas: [
+      '主張の根拠をより強固にする',
+      '具体的なデータや事例を追加する',
+      '反論の説得力をさらに高める',
+    ],
+  },
+  {
+    range: '70-80',
+    minScore: 70,
+    maxScore: 80,
+    title: '上級レベル',
+    characteristics: [
+      '論理的で説得力のある主張ができている',
+      '効果的な反論ができている',
+      '根拠が明確',
+      '一部に改善の余地がある',
+    ],
+    improvementAreas: [
+      '論理展開のさらなる洗練',
+      '相手の主張をより深く分析する',
+      '議論の構造をより最適化する',
+    ],
+  },
+  {
+    range: '80-90',
+    minScore: 80,
+    maxScore: 90,
+    title: 'エキスパートレベル',
+    characteristics: [
+      '高度な論理展開',
+      '強力な根拠と反論',
+      '相手の主張を効果的に崩せている',
+      'ほぼ完璧だが、わずかに改善余地がある',
+    ],
+    improvementAreas: [
+      '議論の微細な部分の最適化',
+      'さらに高度なレトリック技法の活用',
+    ],
+  },
+  {
+    range: '90-100',
+    minScore: 90,
+    maxScore: 100,
+    title: 'マスターレベル',
+    characteristics: [
+      '完璧な論理構成',
+      '圧倒的な説得力',
+      '全ての論点で優位性を示せている',
+    ],
+    improvementAreas: [],
+  },
+];
+
+// スコアから評価基準を取得
+export function getScoreCriteria(score: number): ScoreRangeCriteria | null {
+  return SCORE_CRITERIA.find(
+    (criteria) => score >= criteria.minScore && score <= criteria.maxScore
+  ) || null;
+}
+
+// 総合評価メッセージを生成
+export function generateOverallEvaluation(overallScore: number): string {
+  const criteria = getScoreCriteria(overallScore);
+  if (!criteria) return '';
+
+  const characteristicsText = criteria.characteristics
+    .map((char, index) => `${index + 1}. ${char}`)
+    .join('\n');
+
+  let message = `あなたの総合スコアは${overallScore}点で、「${criteria.title}」です。\n\n【特徴】\n${characteristicsText}`;
+
+  if (criteria.improvementAreas && criteria.improvementAreas.length > 0) {
+    const improvementText = criteria.improvementAreas
+      .map((area, index) => `${index + 1}. ${area}`)
+      .join('\n');
+    message += `\n\n【改善のポイント】\n${improvementText}`;
+  }
+
+  return message;
+}
+
 // スコア計算ロジック
 // キャラクターのレベルとバイアスに基づいてスコアを生成
 export function calculateDebateScore(
