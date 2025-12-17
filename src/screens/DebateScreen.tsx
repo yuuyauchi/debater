@@ -17,12 +17,7 @@ import { RouteProp, CommonActions } from '@react-navigation/native';
 import { CHARACTERS, TOPICS, CHARACTER_IMAGES } from '../data/mockData';
 import { getChallengerResponse } from '../services/MastraApiService';
 import { VoiceInputBar } from '../components/VoiceInputBar';
-
-export interface TurnMessage {
-  text: string;
-  turn: number;
-  phase: string;
-}
+import { TurnMessage } from '../types/debate';
 
 type RootStackParamList = {
   MainTabs: undefined;

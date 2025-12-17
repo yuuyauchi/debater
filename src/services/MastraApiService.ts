@@ -600,21 +600,23 @@ export async function getEvaluationAndFeedback(
   const character = CHARACTERS.find(c => c.id === characterId);
   const characterLevel = character?.level || 5;
 
-  // Judge Analystでスコアを取得
+  // Judge Analystでスコアを取得（これは他の処理の基礎となるため先に実行）
   const scores = await getJudgeScore(debateLog, characterLevel);
 
-  // Learning Coachでフィードバックを生成
-  const feedbackText = await getCoachingFeedback(debateLog, scores);
+  // Learning Coachとターンフィードバックを並列実行
+  const [feedbackText, turnFeedbacks] = await Promise.allSettled([
+    getCoachingFeedback(debateLog, scores),
+    turnMessages && turnMessages.length > 0
+      ? getTurnByTurnFeedback(turnMessages, debateLog)
+      : Promise.resolve(undefined),
+  ]).then(results => [
+    results[0].status === 'fulfilled' ? results[0].value : '',
+    results[1].status === 'fulfilled' ? results[1].value : undefined,
+  ]);
 
-  // 各ターンのフィードバックを生成
-  let turnFeedbacks: TurnFeedback[] | undefined;
-  if (turnMessages && turnMessages.length > 0) {
-    try {
-      turnFeedbacks = await getTurnByTurnFeedback(turnMessages, debateLog);
-    } catch (error) {
-      console.error('[getEvaluationAndFeedback] Turn feedback error:', error);
-      // ターンフィードバックの生成に失敗しても、他の評価は継続
-    }
+  // ターンフィードバック生成に失敗した場合はログ出力（エラーは握りつぶす）
+  if (!turnFeedbacks && turnMessages && turnMessages.length > 0) {
+    console.warn('[getEvaluationAndFeedback] Turn feedback generation failed, continuing without it');
   }
 
   // 総合スコアと勝敗を計算
@@ -642,8 +644,8 @@ export async function getEvaluationAndFeedback(
       winner,
       feedback: feedbackItems,
     },
-    feedback: feedbackText,
-    turnFeedbacks,
+    feedback: feedbackText as string,
+    turnFeedbacks: turnFeedbacks as TurnFeedback[] | undefined,
   };
 }
 

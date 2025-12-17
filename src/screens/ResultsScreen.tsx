@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, CommonActions } from '@react-navigation/native';
@@ -15,7 +16,7 @@ import { getEvaluationAndFeedback, EvaluationResult, EvaluationAndFeedbackResult
 import { RadarChart } from '../components/RadarChart';
 import { useUser } from '../context/UserContext';
 import { getScoreCriteria, generateOverallEvaluation, SCORE_CRITERIA } from '../utils/scoringLogic';
-import { TurnMessage } from './DebateScreen';
+import { TurnMessage } from '../types/debate';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -71,6 +72,24 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
         );
       } catch (error) {
         console.error('Analysis error:', error);
+        setIsAnalyzing(false);
+        Alert.alert(
+          '分析エラー',
+          'ディベートの分析中にエラーが発生しました。もう一度お試しください。',
+          [
+            {
+              text: 'ホームに戻る',
+              onPress: () => {
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: 'MainTabs' }],
+                  })
+                );
+              },
+            },
+          ]
+        );
       } finally {
         setIsAnalyzing(false);
       }
@@ -87,7 +106,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
           <ActivityIndicator size="large" color="#4A90D9" />
           <Text style={styles.loadingTitle}>AIが分析中...</Text>
           <Text style={styles.loadingText}>
-            GPT-5があなたのディベートを{'\n'}評価しています
+            AIがあなたのディベートを{'\n'}詳細に分析しています
           </Text>
           <View style={styles.loadingSteps}>
             <Text style={styles.loadingStep}>📊 論理構造を分析中...</Text>
