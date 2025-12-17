@@ -240,7 +240,7 @@ async function getChallengerResponseDirect(
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `以下はこれまでの議論です。最後のユーザーの発言に対して反論してください。\n\n${transcript}` },
+        { role: 'user', content: transcript },
       ],
       max_tokens: 500,
       temperature: 0.8,
@@ -721,9 +721,12 @@ function getCharacterSystemPrompt(
   return `${basePrompt}${topicInfo}
 
 【重要な指示】
-- ユーザーの主張に対して反証（反論）を行います。
-- 反論は具体的で論理的であるべきです。
-- 応答は2〜4文程度で簡潔にまとめてください。
+- あなたはディベートの対戦相手として、ユーザーと議論を行います。
+- ユーザーから提示される指示に従い、フェーズに応じた適切な応答をしてください。
+- 主張を述べる際は、明確な論拠と具体例を含めてください。
+- 反論する際は、相手の主張の弱点を指摘し、具体的な反証を提示してください。
+- あなたの立場（${stanceText}）を一貫して維持してください。
+- 応答は自然な会話形式で、読みやすい長さ（3〜6文程度）にしてください。
 - 日本語で応答してください。`;
 }
 
