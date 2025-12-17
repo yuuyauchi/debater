@@ -51,6 +51,16 @@ export interface EvaluationResult {
 export interface EvaluationAndFeedbackResult {
   scores: EvaluationResult;
   feedback: string;
+  turnFeedbacks?: TurnFeedback[];
+}
+
+export interface TurnFeedback {
+  turn: number;
+  phase: string;
+  userMessage: string;
+  strengths: string[];      // 良い点
+  improvements: string[];   // 改善点
+  specificExample: string;  // 具体例
 }
 
 // 録音の状態管理
@@ -464,16 +474,128 @@ export async function getCoachingFeedback(
 }
 
 // =====================================
+// Turn-by-Turn Feedback Agent
+// =====================================
+
+/**
+ * 各ターンの発言に対する詳細なフィードバックを生成
+ *
+ * @param turnMessages - ターンごとのユーザーメッセージ
+ * @param debateLog - 議論ログ全体
+ * @returns 各ターンの良い点・改善点を含むフィードバック
+ */
+export async function getTurnByTurnFeedback(
+  turnMessages: Array<{ text: string; turn: number; phase: string }>,
+  debateLog: string
+): Promise<TurnFeedback[]> {
+  console.log('[Turn Feedback] Generating turn-by-turn feedback...');
+
+  if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 20) {
+    console.error('[Turn Feedback] API key not configured');
+    throw new Error('OpenAI APIキーが設定されていません');
+  }
+
+  try {
+    const systemPrompt = `あなたはディベートコーチです。ユーザーの各ターンの発言を分析し、具体的で建設的なフィードバックを提供します。
+
+【役割】
+- 各ターンの発言について、良い点を2-3個見つける
+- 改善できる点を2-3個具体的に指摘する
+- 発言から具体例を引用しながらフィードバックを行う
+- 励ましを含めた建設的なトーンで書く
+
+【フィードバックの観点】
+- 論理構造：主張の明確さ、論理の流れ
+- 証拠力：具体例やデータの使用
+- 話し方：相手への敬意、表現の適切さ
+- 反論力：相手の主張への対応
+- 構造化：議論の整理、ポイントの明確さ
+
+必ずJSON配列形式で回答してください。`;
+
+    const userPrompt = `以下のディベートから、ユーザーの各ターンの発言を分析してください。
+
+【議論全体】
+${debateLog}
+
+【ユーザーの各ターン発言】
+${turnMessages.map(tm => `ターン${tm.turn}（${tm.phase}）: ${tm.text}`).join('\n\n')}
+
+以下のJSON形式で、各ターンのフィードバックを返してください：
+[
+  {
+    "turn": <ターン番号>,
+    "strengths": ["良い点1", "良い点2"],
+    "improvements": ["改善点1", "改善点2"],
+    "specificExample": "発言から引用した具体例と分析"
+  }
+]`;
+
+    const response = await fetchWithXHR(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: 1500,
+          temperature: 0.7,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const result = JSON.parse(response.body);
+    const text = result.choices?.[0]?.message?.content || '';
+
+    // JSONをパース
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const feedbacks = JSON.parse(jsonMatch[0]);
+
+      // ターンメッセージの情報をマージ
+      return feedbacks.map((fb: any) => {
+        const turnMsg = turnMessages.find(tm => tm.turn === fb.turn);
+        return {
+          turn: fb.turn,
+          phase: turnMsg?.phase || '',
+          userMessage: turnMsg?.text || '',
+          strengths: fb.strengths || [],
+          improvements: fb.improvements || [],
+          specificExample: fb.specificExample || '',
+        };
+      });
+    }
+
+    throw new Error('Failed to parse turn feedback from response');
+  } catch (error) {
+    console.error('[Turn Feedback] API error:', error);
+    throw error;
+  }
+}
+
+// =====================================
 // 統合関数（後方互換性のため維持）
 // =====================================
 
 /**
  * 評価とフィードバックを統合して取得
- * getJudgeScore + getCoachingFeedback を内部で呼び出す
+ * getJudgeScore + getCoachingFeedback + getTurnByTurnFeedback を内部で呼び出す
  */
 export async function getEvaluationAndFeedback(
   debateLog: string,
-  characterId: string = 'sakura'
+  characterId: string = 'sakura',
+  turnMessages?: Array<{ text: string; turn: number; phase: string }>
 ): Promise<EvaluationAndFeedbackResult> {
   const character = CHARACTERS.find(c => c.id === characterId);
   const characterLevel = character?.level || 5;
@@ -483,6 +605,17 @@ export async function getEvaluationAndFeedback(
 
   // Learning Coachでフィードバックを生成
   const feedbackText = await getCoachingFeedback(debateLog, scores);
+
+  // 各ターンのフィードバックを生成
+  let turnFeedbacks: TurnFeedback[] | undefined;
+  if (turnMessages && turnMessages.length > 0) {
+    try {
+      turnFeedbacks = await getTurnByTurnFeedback(turnMessages, debateLog);
+    } catch (error) {
+      console.error('[getEvaluationAndFeedback] Turn feedback error:', error);
+      // ターンフィードバックの生成に失敗しても、他の評価は継続
+    }
+  }
 
   // 総合スコアと勝敗を計算
   const overallScore = Math.round(
@@ -510,6 +643,7 @@ export async function getEvaluationAndFeedback(
       feedback: feedbackItems,
     },
     feedback: feedbackText,
+    turnFeedbacks,
   };
 }
 

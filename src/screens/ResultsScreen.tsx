@@ -11,16 +11,17 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, CommonActions } from '@react-navigation/native';
 import { CHARACTERS, TOPICS } from '../data/mockData';
-import { getEvaluationAndFeedback, EvaluationResult, EvaluationAndFeedbackResult } from '../services/MastraApiService';
+import { getEvaluationAndFeedback, EvaluationResult, EvaluationAndFeedbackResult, TurnFeedback } from '../services/MastraApiService';
 import { RadarChart } from '../components/RadarChart';
 import { useUser } from '../context/UserContext';
 import { getScoreCriteria, generateOverallEvaluation, SCORE_CRITERIA } from '../utils/scoringLogic';
+import { TurnMessage } from './DebateScreen';
 
 type RootStackParamList = {
   MainTabs: undefined;
   CharacterSelect: undefined;
   Debate: { characterId: string; topicId: string; stance: 'pro' | 'con' };
-  Results: { characterId: string; topicId: string; stance: 'pro' | 'con'; messages: string[] };
+  Results: { characterId: string; topicId: string; stance: 'pro' | 'con'; messages: TurnMessage[] };
 };
 
 type ResultsScreenProps = {
@@ -37,6 +38,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
 
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [learningCoachFeedback, setLearningCoachFeedback] = useState<string>('');
+  const [turnFeedbacks, setTurnFeedbacks] = useState<TurnFeedback[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(true);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -47,15 +49,17 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
       setIsAnalyzing(true);
       try {
         // 議論全文を構築
-        const transcript = messages.join('\n\n');
+        const transcript = messages.map(m => m.text).join('\n\n');
 
-        // Judge Analyst + Learning Coach によるディベート評価
+        // Judge Analyst + Learning Coach + Turn-by-Turn Feedback によるディベート評価
         const analysisResult: EvaluationAndFeedbackResult = await getEvaluationAndFeedback(
           transcript,
-          characterId
+          characterId,
+          messages  // ターンメッセージを渡す
         );
         setResult(analysisResult.scores);
         setLearningCoachFeedback(analysisResult.feedback);
+        setTurnFeedbacks(analysisResult.turnFeedbacks || []);
 
         // ユーザーデータを更新
         updateUserAfterDebate(
@@ -243,6 +247,66 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
                   <Text style={styles.feedbackScoreGood}>{item.score}点</Text>
                 </View>
                 <Text style={styles.feedbackMessage}>{item.message}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* 各ターンの詳細フィードバック */}
+        {turnFeedbacks.length > 0 && (
+          <View style={styles.feedbackContainer}>
+            <Text style={styles.sectionTitle}>📝 各ターンの詳細フィードバック</Text>
+            <Text style={styles.sectionSubtitle}>
+              あなたの各発言について、良い点と改善点を具体的に分析しました
+            </Text>
+            {turnFeedbacks.map((feedback, index) => (
+              <View key={index} style={styles.turnFeedbackCard}>
+                <View style={styles.turnFeedbackHeader}>
+                  <Text style={styles.turnNumber}>ターン {feedback.turn}</Text>
+                  <View style={styles.phaseBadge}>
+                    <Text style={styles.phaseBadgeText}>{feedback.phase}</Text>
+                  </View>
+                </View>
+
+                {/* ユーザーの発言 */}
+                <View style={styles.userMessageBox}>
+                  <Text style={styles.userMessageLabel}>あなたの発言:</Text>
+                  <Text style={styles.userMessageText}>{feedback.userMessage}</Text>
+                </View>
+
+                {/* 良い点 */}
+                {feedback.strengths.length > 0 && (
+                  <View style={styles.feedbackSection}>
+                    <Text style={styles.feedbackSectionTitle}>✨ 良い点</Text>
+                    {feedback.strengths.map((strength, idx) => (
+                      <View key={idx} style={styles.feedbackPoint}>
+                        <Text style={styles.feedbackBullet}>•</Text>
+                        <Text style={styles.feedbackPointText}>{strength}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* 改善点 */}
+                {feedback.improvements.length > 0 && (
+                  <View style={styles.feedbackSection}>
+                    <Text style={styles.feedbackSectionTitle}>💡 改善点</Text>
+                    {feedback.improvements.map((improvement, idx) => (
+                      <View key={idx} style={styles.feedbackPoint}>
+                        <Text style={styles.feedbackBullet}>•</Text>
+                        <Text style={styles.feedbackPointText}>{improvement}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* 具体例 */}
+                {feedback.specificExample && (
+                  <View style={styles.specificExampleBox}>
+                    <Text style={styles.specificExampleTitle}>📌 具体的な分析</Text>
+                    <Text style={styles.specificExampleText}>{feedback.specificExample}</Text>
+                  </View>
+                )}
               </View>
             ))}
           </View>
@@ -756,6 +820,108 @@ const styles = StyleSheet.create({
   },
   criteriaDetailText: {
     flex: 1,
+    fontSize: 13,
+    color: '#5D6D7E',
+    lineHeight: 19,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#7F8C8D',
+    marginBottom: 15,
+    marginTop: -5,
+  },
+  turnFeedbackCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4A90D9',
+  },
+  turnFeedbackHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  turnNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  phaseBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  phaseBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1976D2',
+  },
+  userMessageBox: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 15,
+  },
+  userMessageLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#7F8C8D',
+    marginBottom: 6,
+  },
+  userMessageText: {
+    fontSize: 14,
+    color: '#2C3E50',
+    lineHeight: 20,
+  },
+  feedbackSection: {
+    marginBottom: 12,
+  },
+  feedbackSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 8,
+  },
+  feedbackPoint: {
+    flexDirection: 'row',
+    marginBottom: 6,
+    paddingLeft: 5,
+  },
+  feedbackBullet: {
+    fontSize: 14,
+    color: '#4A90D9',
+    marginRight: 8,
+    fontWeight: 'bold',
+  },
+  feedbackPointText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#5D6D7E',
+    lineHeight: 20,
+  },
+  specificExampleBox: {
+    backgroundColor: '#FFF9E6',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9800',
+  },
+  specificExampleTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 6,
+  },
+  specificExampleText: {
     fontSize: 13,
     color: '#5D6D7E',
     lineHeight: 19,

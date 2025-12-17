@@ -18,11 +18,17 @@ import { CHARACTERS, TOPICS, CHARACTER_IMAGES } from '../data/mockData';
 import { getChallengerResponse } from '../services/MastraApiService';
 import { VoiceInputBar } from '../components/VoiceInputBar';
 
+export interface TurnMessage {
+  text: string;
+  turn: number;
+  phase: string;
+}
+
 type RootStackParamList = {
   MainTabs: undefined;
   CharacterSelect: undefined;
   Debate: { characterId: string; topicId: string; stance: 'pro' | 'con' };
-  Results: { characterId: string; topicId: string; stance: 'pro' | 'con'; messages: string[] };
+  Results: { characterId: string; topicId: string; stance: 'pro' | 'con'; messages: TurnMessage[] };
 };
 
 type DebateScreenProps = {
@@ -313,9 +319,13 @@ ${baseContext}
       timerRef.current = null;
     }
 
-    const userMessages = messages
+    const userMessages: TurnMessage[] = messages
       .filter((m) => m.sender === 'user')
-      .map((m) => m.text);
+      .map((m) => ({
+        text: m.text,
+        turn: m.turn || 0,
+        phase: m.phase || '',
+      }));
 
     navigation.replace('Results', {
       characterId,
