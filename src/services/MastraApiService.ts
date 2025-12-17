@@ -12,7 +12,7 @@
 
 import { Audio } from 'expo-av';
 import Constants from 'expo-constants';
-import { Character, CHARACTERS } from '../data/mockData';
+import { CHARACTERS } from '../data/mockData';
 
 // API設定
 const expoExtra = Constants.expoConfig?.extra;
@@ -549,8 +549,7 @@ function getCoachingFeedbackFallback(scores: EvaluationScores): string {
  */
 export async function getEvaluationAndFeedback(
   debateLog: string,
-  characterId: string = 'sakura',
-  userMessages: string[] = []
+  characterId: string = 'sakura'
 ): Promise<EvaluationAndFeedbackResult> {
   const character = CHARACTERS.find(c => c.id === characterId);
   const characterLevel = character?.level || 5;
@@ -594,36 +593,15 @@ export async function getEvaluationAndFeedback(
 export const getAgentResponse = getChallengerResponse;
 export const analyzeDebate = async (
   transcript: string,
-  characterId: string,
-  userMessages: string[]
+  characterId: string
 ): Promise<EvaluationResult> => {
-  const result = await getEvaluationAndFeedback(transcript, characterId, userMessages);
+  const result = await getEvaluationAndFeedback(transcript, characterId);
   return result.scores;
 };
 
 // =====================================
 // ヘルパー関数
 // =====================================
-
-function buildChallengerPrompt(
-  transcript: string,
-  charId: string,
-  topicTitle?: string,
-  aiStance?: 'pro' | 'con'
-): string {
-  const stanceText = aiStance === 'pro' ? '賛成' : '反対';
-  const topicInfo = topicTitle
-    ? `【トピック】${topicTitle}\n【あなたの立場】${stanceText}\n\n`
-    : '';
-
-  const charInfo = getCharacterInfo(charId);
-
-  return `${charInfo}
-
-${topicInfo}以下はこれまでの議論です。最後のユーザーの発言に対して反論してください。
-
-${transcript}`;
-}
 
 function buildJudgePrompt(debateLog: string, characterLevel: number): string {
   return `以下のディベートログを評価し、ユーザーのパフォーマンスを5つの軸でスコア化してください。
@@ -677,17 +655,6 @@ ${debateLog}
 4. 学習タブへの誘導（1文）
 
 日本語で、励ましを含めた建設的なトーンで書いてください。`;
-}
-
-function getCharacterInfo(charId: string): string {
-  const charInfoMap: Record<string, string> = {
-    sakura: '【キャラクター】桜子サクラ（初級・穏やかで優しい）',
-    kenji: '【キャラクター】論理のケンジ（中級・論理的で冷静）',
-    yuki: '【キャラクター】証拠のユキ（中上級・データ重視）',
-    takeshi: '【キャラクター】反論のタケシ（上級・鋭く挑戦的）',
-    tetsuo: '【キャラクター】鉄人テツオ（最上級・多角的分析）',
-  };
-  return charInfoMap[charId] || charInfoMap['sakura'];
 }
 
 function getCharacterSystemPrompt(
