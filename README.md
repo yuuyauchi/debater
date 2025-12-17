@@ -1,52 +1,55 @@
 # Debate Dojo (ディベート道場)
 
-AIキャラクターとのディベート対戦を通じてディベートスキル向上を促進するiOS/Androidアプリのプロトタイプです。
+AIキャラクターとのディベート対戦を通じてディベートスキル向上を促進するiOS/Androidアプリです。
 
-## V4.0 アップデート - Mastra統合
-
-### Mastraサーバーによるエージェント管理
-
-**Mastra**フレームワークを使用したバックエンドサーバーを導入し、AIエージェントを一元管理するアーキテクチャに刷新しました。
-
-#### アーキテクチャ
+## アーキテクチャ
 
 ```
-┌─────────────────────┐     ┌─────────────────────────────┐
-│  React Native App   │────▶│     Mastra Server           │
-│  (Expo)             │     │     (Node.js)               │
-│                     │     │                             │
-│  - UI/UX            │     │  ┌─────────────────────┐    │
-│  - 音声録音         │     │  │ debate-challenger   │    │
-│  - MastraApiService │     │  │ (対戦エージェント)   │    │
-└─────────────────────┘     │  └─────────────────────┘    │
-                            │  ┌─────────────────────┐    │
-                            │  │ judge-analyst       │    │
-                            │  │ (評価エージェント)   │    │
-                            │  └─────────────────────┘    │
-                            │  ┌─────────────────────┐    │
-                            │  │ learning-coach      │    │
-                            │  │ (学習コーチ)         │    │
-                            │  └─────────────────────┘    │
-                            └─────────────────────────────┘
+┌──────────────────────────────────┐
+│    React Native App (Expo)       │
+│                                  │
+│  - UI/UX                         │
+│  - 音声録音・音声認識            │
+│  - OpenAI API直接統合            │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │ AI機能                     │  │
+│  │ - Whisper STT             │  │
+│  │ - Debate Challenger       │  │
+│  │ - Judge Analyst           │  │
+│  │ - Learning Coach          │  │
+│  └────────────────────────────┘  │
+└──────────────────────────────────┘
+           │
+           ↓
+  OpenAI API (gpt-4o-mini)
 ```
 
-#### 4つのAIエージェント
+## 主要機能
 
-| エージェント | 役割 | 説明 |
-|-------------|------|------|
-| **Mastra Voice** | STT | OpenAI Whisper APIで音声をテキストに変換 |
-| **Debate Challenger** | 対戦 | キャラクター別の反証を生成 |
-| **Judge Analyst** | 評価 | 5軸スコアをJSON形式で算出 |
-| **Learning Coach** | 学習 | 個別フィードバックを生成 |
+### 3つのAIエージェント機能
 
-#### 設計仕様通りの関数分離
+| 機能 | 役割 | 使用モデル |
+|------|------|-----------|
+| **Whisper STT** | 音声認識 | OpenAI Whisper API |
+| **Debate Challenger** | 対戦 | GPT-4o-mini：キャラクター別の反証を生成 |
+| **Judge Analyst** | 評価 | GPT-4o-mini：5軸スコアをJSON形式で算出 |
+| **Learning Coach** | 学習 | GPT-4o-mini：個別フィードバックを生成 |
+
+### API関数
 
 ```typescript
-// 4つの独立した関数
-transcribeAudio(audioUri)           // STT
-getChallengerResponse(transcript)   // 反証生成
-getJudgeScore(debateLog)            // 評価スコア
-getCoachingFeedback(debateLog)      // フィードバック
+// 音声認識
+transcribeAudio(audioUri: string): Promise<string>
+
+// 反証生成
+getChallengerResponse(transcript: string, charId: string): Promise<string>
+
+// 評価スコア
+getJudgeScore(debateLog: string, characterLevel: number): Promise<EvaluationScores>
+
+// フィードバック
+getCoachingFeedback(debateLog: string, scores: EvaluationScores): Promise<string>
 ```
 
 ---
@@ -63,53 +66,30 @@ getCoachingFeedback(debateLog)      // フィードバック
 ### 1. 依存関係のインストール
 
 ```bash
-# React Nativeアプリ
 npm install
-
-# Mastraサーバー
-cd mastra-server
-npm install
-cd ..
 ```
 
 ### 2. 環境変数の設定
 
-```bash
-# プロジェクトルートに.envファイルを作成
-cp .env.example .env
+プロジェクトルートに`.env`ファイルを作成：
 
-# .envを編集
+```bash
+cp .env.example .env
+```
+
+`.env`ファイルを編集してOpenAI APIキーを設定：
+
+```
 OPENAI_API_KEY=sk-your-api-key-here
-MASTRA_SERVER_URL=http://localhost:4111
 ```
 
-Mastraサーバーにも.envを設定：
+### 3. アプリ起動
 
-```bash
-cd mastra-server
-cp .env.example .env
-# OPENAI_API_KEYを設定
-```
-
-### 3. サーバー起動
-
-**ターミナル1 - Mastraサーバー:**
-```bash
-cd mastra-server
-npm run dev
-```
-
-サーバーが `http://localhost:4111` で起動します。
-
-**ターミナル2 - Expoアプリ:**
 ```bash
 npm start
 ```
 
-### 4. 動作確認
-
-- Mastra Studio: http://localhost:4111 でエージェントを確認
-- Expoアプリ: QRコードをスキャンしてアプリを起動
+Expo Goアプリで表示されたQRコードをスキャンしてアプリを起動します。
 
 ---
 
@@ -120,21 +100,29 @@ debater/
 ├── App.tsx                          # エントリポイント
 ├── src/
 │   ├── services/
-│   │   └── MastraApiService.ts      # Mastraクライアント [V4.0]
+│   │   └── MastraApiService.ts      # OpenAI API統合サービス
 │   ├── screens/
-│   │   ├── DebateScreen.tsx         # ボイス・ファーストUI
-│   │   └── ResultsScreen.tsx        # Learning Coach表示
+│   │   ├── HomeScreen.tsx           # ホーム画面
+│   │   ├── CharacterSelectScreen.tsx # キャラクター選択
+│   │   ├── DebateScreen.tsx         # ディベート画面（音声入力対応）
+│   │   ├── ResultsScreen.tsx        # 評価結果・フィードバック表示
+│   │   ├── LearnScreen.tsx          # 学習コンテンツ
+│   │   ├── ProfileScreen.tsx        # プロフィール
+│   │   ├── RankingScreen.tsx        # ランキング
+│   │   └── SettingsScreen.tsx       # 設定
 │   ├── components/
 │   │   ├── RadarChart.tsx           # レーダーチャート
 │   │   └── VoiceInputBar.tsx        # 音声入力UI
-│   └── ...
-├── mastra-server/                   # Mastraバックエンド [V4.0]
-│   ├── src/
-│   │   └── index.ts                 # エージェント定義
-│   ├── package.json
-│   └── tsconfig.json
+│   ├── data/
+│   │   └── mockData.ts              # キャラクター・トピックデータ
+│   ├── context/
+│   │   └── UserContext.tsx          # ユーザー状態管理
+│   └── navigation/
+│       └── TabNavigator.tsx         # タブナビゲーション
+├── assets/                          # 画像・アイコン
 ├── package.json
-└── .env.example
+├── .env.example
+└── tsconfig.json
 ```
 
 ---
@@ -143,63 +131,19 @@ debater/
 
 ### MastraApiService.ts
 
-React NativeアプリからMastraサーバーを呼び出すクライアント層：
+OpenAI APIを直接呼び出すサービス層：
 
-| 関数 | 用途 | 接続先 |
-|------|------|--------|
-| `transcribeAudio()` | 音声認識 | OpenAI Whisper API (直接) |
-| `getChallengerResponse()` | 反証生成 | Mastra Server → debate-challenger |
-| `getJudgeScore()` | 評価スコア | Mastra Server → judge-analyst |
-| `getCoachingFeedback()` | フィードバック | Mastra Server → learning-coach |
+| 関数 | 用途 | API |
+|------|------|-----|
+| `transcribeAudio()` | 音声認識 | OpenAI Whisper API |
+| `getChallengerResponse()` | 反証生成 | OpenAI GPT-4o-mini |
+| `getJudgeScore()` | 評価スコア | OpenAI GPT-4o-mini |
+| `getCoachingFeedback()` | フィードバック | OpenAI GPT-4o-mini |
 
 ### フォールバック機構
 
-Mastraサーバーに接続できない場合：
-1. 直接OpenAI APIを呼び出す（フォールバック）
-2. それも失敗した場合はモックレスポンスを返す
-
----
-
-## Mastraサーバー詳細
-
-### エージェント定義 (mastra-server/src/index.ts)
-
-```typescript
-import { Mastra, Agent } from '@mastra/core';
-
-// Debate Challenger Agent
-const debateChallengerAgent = new Agent({
-  name: 'debate-challenger',
-  instructions: `ディベート練習相手として反証を行う...`,
-  model: { provider: 'OPENAI', name: 'gpt-4o-mini' },
-});
-
-// Judge Analyst Agent
-const judgeAnalystAgent = new Agent({
-  name: 'judge-analyst',
-  instructions: `5つの軸で評価しJSONで返す...`,
-  model: { provider: 'OPENAI', name: 'gpt-4o-mini' },
-});
-
-// Learning Coach Agent
-const learningCoachAgent = new Agent({
-  name: 'learning-coach',
-  instructions: `学習フィードバックを生成...`,
-  model: { provider: 'OPENAI', name: 'gpt-4o-mini' },
-});
-
-export const mastra = new Mastra({
-  agents: { debateChallengerAgent, judgeAnalystAgent, learningCoachAgent },
-});
-```
-
-### APIエンドポイント
-
-Mastraサーバーは以下のエンドポイントを自動公開：
-
-- `POST /api/agents/debate-challenger/generate`
-- `POST /api/agents/judge-analyst/generate`
-- `POST /api/agents/learning-coach/generate`
+APIキーが未設定、またはAPI呼び出しに失敗した場合：
+- モックレスポンスを返してアプリの動作を継続
 
 ---
 
@@ -223,38 +167,43 @@ Mastraサーバーは以下のエンドポイントを自動公開：
 
 ## 技術スタック
 
-### フロントエンド (React Native)
-- Expo
+### フロントエンド
+- React Native (Expo)
 - TypeScript
-- React Navigation v6
-- react-native-svg
-- expo-av / expo-file-system
+- React Navigation v7
+- react-native-svg（レーダーチャート）
+- expo-av（音声録音）
+- expo-file-system（ファイル操作）
 
-### バックエンド (Mastra)
-- Mastra Framework
-- Node.js 20+
-- OpenAI API (GPT-4o-mini)
+### AI/ML
+- OpenAI Whisper API（音声認識）
+- OpenAI GPT-4o-mini（ディベート・評価・フィードバック生成）
 
 ---
 
 ## 今後の拡張案
 
+### 実装済み
 - [x] 音声入力対応（STT）
 - [x] AI応答生成（LLM）
 - [x] ボイス・ファーストUI
 - [x] Learning Coachフィードバック
 - [x] AI反証生成機能
-- [x] Mastraプラットフォーム統合
-- [x] 設計仕様通りの関数分離
-- [ ] Mastra Workflow（複数エージェント連携）
+- [x] キャラクター別の個性設定
+- [x] 5軸評価システム
+
+### 開発中・検討中
+- [ ] 課金機能（キャラクター解放システム）
+- [ ] ディベート評価基準の明確化
 - [ ] RAG（知識ベース検索）
 - [ ] マルチプレイヤー対戦
 - [ ] ダークモード対応
+- [ ] 履歴・分析機能の強化
 
 ---
 
 ## 参考資料
 
-- [Mastra Documentation](https://mastra.ai/docs)
-- [Mastra GitHub](https://github.com/mastra-ai/mastra)
-- [@mastra/core npm](https://www.npmjs.com/package/@mastra/core)
+- [OpenAI API Documentation](https://platform.openai.com/docs)
+- [Expo Documentation](https://docs.expo.dev/)
+- [React Navigation](https://reactnavigation.org/)
