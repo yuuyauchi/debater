@@ -7,19 +7,22 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, CommonActions } from '@react-navigation/native';
 import { CHARACTERS, TOPICS } from '../data/mockData';
-import { getEvaluationAndFeedback, EvaluationResult, EvaluationAndFeedbackResult } from '../services/MastraApiService';
+import { getEvaluationAndFeedback, EvaluationResult, EvaluationAndFeedbackResult, TurnFeedback } from '../services/MastraApiService';
 import { RadarChart } from '../components/RadarChart';
 import { useUser } from '../context/UserContext';
+import { getScoreCriteria, generateOverallEvaluation, SCORE_CRITERIA } from '../utils/scoringLogic';
+import { TurnMessage } from '../types/debate';
 
 type RootStackParamList = {
   MainTabs: undefined;
   CharacterSelect: undefined;
   Debate: { characterId: string; topicId: string; stance: 'pro' | 'con' };
-  Results: { characterId: string; topicId: string; stance: 'pro' | 'con'; messages: string[] };
+  Results: { characterId: string; topicId: string; stance: 'pro' | 'con'; messages: TurnMessage[] };
 };
 
 type ResultsScreenProps = {
@@ -36,6 +39,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
 
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [learningCoachFeedback, setLearningCoachFeedback] = useState<string>('');
+  const [turnFeedbacks, setTurnFeedbacks] = useState<TurnFeedback[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(true);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -46,16 +50,17 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
       setIsAnalyzing(true);
       try {
         // 議論全文を構築
-        const transcript = messages.join('\n\n');
+        const transcript = messages.map(m => m.text).join('\n\n');
 
-        // Judge Analyst + Learning Coach によるディベート評価
+        // Judge Analyst + Learning Coach + Turn-by-Turn Feedback によるディベート評価
         const analysisResult: EvaluationAndFeedbackResult = await getEvaluationAndFeedback(
           transcript,
           characterId,
-          messages
+          messages  // ターンメッセージを渡す
         );
         setResult(analysisResult.scores);
         setLearningCoachFeedback(analysisResult.feedback);
+        setTurnFeedbacks(analysisResult.turnFeedbacks || []);
 
         // ユーザーデータを更新
         updateUserAfterDebate(
@@ -67,6 +72,24 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
         );
       } catch (error) {
         console.error('Analysis error:', error);
+        setIsAnalyzing(false);
+        Alert.alert(
+          '分析エラー',
+          'ディベートの分析中にエラーが発生しました。もう一度お試しください。',
+          [
+            {
+              text: 'ホームに戻る',
+              onPress: () => {
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: 'MainTabs' }],
+                  })
+                );
+              },
+            },
+          ]
+        );
       } finally {
         setIsAnalyzing(false);
       }
@@ -83,7 +106,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
           <ActivityIndicator size="large" color="#4A90D9" />
           <Text style={styles.loadingTitle}>AIが分析中...</Text>
           <Text style={styles.loadingText}>
-            GPT-5があなたのディベートを{'\n'}評価しています
+            AIがあなたのディベートを{'\n'}詳細に分析しています
           </Text>
           <View style={styles.loadingSteps}>
             <Text style={styles.loadingStep}>📊 論理構造を分析中...</Text>
@@ -125,6 +148,10 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
   const lowScoreFeedback = result.feedback.filter((f) => f.score < 60);
   const highScoreFeedback = result.feedback.filter((f) => f.score >= 80);
 
+  // 総合評価基準を取得
+  const scoreCriteria = getScoreCriteria(result.overallScore);
+  const overallEvaluation = generateOverallEvaluation(result.overallScore);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -148,6 +175,40 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
           <Text style={styles.overallScoreValue}>{result.overallScore}</Text>
           <Text style={styles.overallScoreMax}>/ 100</Text>
         </View>
+
+        {/* 評価レベル表示 */}
+        {scoreCriteria && (
+          <View style={styles.criteriaContainer}>
+            <View style={styles.criteriaHeader}>
+              <Text style={styles.criteriaTitle}>📊 あなたのレベル</Text>
+              <View style={styles.levelBadge}>
+                <Text style={styles.levelBadgeText}>{scoreCriteria.title}</Text>
+              </View>
+            </View>
+
+            <View style={styles.criteriaSection}>
+              <Text style={styles.criteriaSectionTitle}>特徴</Text>
+              {scoreCriteria.characteristics.map((char, index) => (
+                <View key={index} style={styles.criteriaItem}>
+                  <Text style={styles.criteriaBullet}>•</Text>
+                  <Text style={styles.criteriaText}>{char}</Text>
+                </View>
+              ))}
+            </View>
+
+            {scoreCriteria.improvementAreas && scoreCriteria.improvementAreas.length > 0 && (
+              <View style={styles.criteriaSection}>
+                <Text style={styles.criteriaSectionTitle}>次のステップ</Text>
+                {scoreCriteria.improvementAreas.map((area, index) => (
+                  <View key={index} style={styles.criteriaItem}>
+                    <Text style={styles.criteriaBullet}>→</Text>
+                    <Text style={styles.criteriaText}>{area}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* AI分析バッジ */}
         <View style={styles.aiBadge}>
@@ -210,6 +271,66 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
           </View>
         )}
 
+        {/* 各ターンの詳細フィードバック */}
+        {turnFeedbacks.length > 0 && (
+          <View style={styles.feedbackContainer}>
+            <Text style={styles.sectionTitle}>📝 各ターンの詳細フィードバック</Text>
+            <Text style={styles.sectionSubtitle}>
+              あなたの各発言について、良い点と改善点を具体的に分析しました
+            </Text>
+            {turnFeedbacks.map((feedback, index) => (
+              <View key={index} style={styles.turnFeedbackCard}>
+                <View style={styles.turnFeedbackHeader}>
+                  <Text style={styles.turnNumber}>ターン {feedback.turn}</Text>
+                  <View style={styles.phaseBadge}>
+                    <Text style={styles.phaseBadgeText}>{feedback.phase}</Text>
+                  </View>
+                </View>
+
+                {/* ユーザーの発言 */}
+                <View style={styles.userMessageBox}>
+                  <Text style={styles.userMessageLabel}>あなたの発言:</Text>
+                  <Text style={styles.userMessageText}>{feedback.userMessage}</Text>
+                </View>
+
+                {/* 良い点 */}
+                {feedback.strengths.length > 0 && (
+                  <View style={styles.feedbackSection}>
+                    <Text style={styles.feedbackSectionTitle}>✨ 良い点</Text>
+                    {feedback.strengths.map((strength, idx) => (
+                      <View key={idx} style={styles.feedbackPoint}>
+                        <Text style={styles.feedbackBullet}>•</Text>
+                        <Text style={styles.feedbackPointText}>{strength}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* 改善点 */}
+                {feedback.improvements.length > 0 && (
+                  <View style={styles.feedbackSection}>
+                    <Text style={styles.feedbackSectionTitle}>💡 改善点</Text>
+                    {feedback.improvements.map((improvement, idx) => (
+                      <View key={idx} style={styles.feedbackPoint}>
+                        <Text style={styles.feedbackBullet}>•</Text>
+                        <Text style={styles.feedbackPointText}>{improvement}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* 具体例 */}
+                {feedback.specificExample && (
+                  <View style={styles.specificExampleBox}>
+                    <Text style={styles.specificExampleTitle}>📌 具体的な分析</Text>
+                    <Text style={styles.specificExampleText}>{feedback.specificExample}</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* 詳細表示トグル */}
         <TouchableOpacity
           style={styles.detailsToggle}
@@ -221,15 +342,60 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
         </TouchableOpacity>
 
         {showDetails && (
-          <View style={styles.detailsContainer}>
-            <Text style={styles.detailsTitle}>あなたの発言 ({messages.length}件)</Text>
-            {messages.map((msg, index) => (
-              <View key={index} style={styles.messageItem}>
-                <Text style={styles.messageNumber}>#{index + 1}</Text>
-                <Text style={styles.messageContent}>{msg}</Text>
-              </View>
-            ))}
-          </View>
+          <>
+            {/* 評価基準一覧 */}
+            <View style={styles.detailsContainer}>
+              <Text style={styles.detailsTitle}>📋 評価基準一覧</Text>
+              <Text style={styles.detailsSubtitle}>
+                各点数帯の詳細な評価基準をご確認いただけます
+              </Text>
+              {SCORE_CRITERIA.map((criteria, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.criteriaDetailItem,
+                    scoreCriteria?.range === criteria.range && styles.criteriaDetailItemActive,
+                  ]}
+                >
+                  <View style={styles.criteriaDetailHeader}>
+                    <Text style={styles.criteriaDetailRange}>{criteria.range}点</Text>
+                    <Text
+                      style={[
+                        styles.criteriaDetailTitle,
+                        scoreCriteria?.range === criteria.range && styles.criteriaDetailTitleActive,
+                      ]}
+                    >
+                      {criteria.title}
+                    </Text>
+                    {scoreCriteria?.range === criteria.range && (
+                      <View style={styles.currentLevelBadge}>
+                        <Text style={styles.currentLevelBadgeText}>現在</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.criteriaDetailBody}>
+                    {criteria.characteristics.map((char, charIndex) => (
+                      <View key={charIndex} style={styles.criteriaDetailPoint}>
+                        <Text style={styles.criteriaDetailBullet}>•</Text>
+                        <Text style={styles.criteriaDetailText}>{char}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* あなたの発言 */}
+            <View style={styles.detailsContainer}>
+              <Text style={styles.detailsTitle}>あなたの発言 ({messages.length}件)</Text>
+              {messages.map((msg, index) => (
+                <View key={index} style={styles.messageItem}>
+                  <Text style={styles.messageNumber}>#{index + 1}</Text>
+                  <Text style={styles.messageContent}>{msg}</Text>
+                </View>
+              ))}
+            </View>
+          </>
         )}
 
         {/* アクションボタン */}
@@ -546,6 +712,238 @@ const styles = StyleSheet.create({
     color: '#7F8C8D',
     fontSize: 16,
     fontWeight: '600',
+  },
+  criteriaContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  criteriaHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  criteriaTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  levelBadge: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  levelBadgeText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1976D2',
+  },
+  criteriaSection: {
+    marginBottom: 15,
+  },
+  criteriaSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#5D6D7E',
+    marginBottom: 10,
+  },
+  criteriaItem: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    paddingLeft: 5,
+  },
+  criteriaBullet: {
+    fontSize: 14,
+    color: '#4A90D9',
+    marginRight: 10,
+    fontWeight: 'bold',
+  },
+  criteriaText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#5D6D7E',
+    lineHeight: 20,
+  },
+  detailsSubtitle: {
+    fontSize: 13,
+    color: '#7F8C8D',
+    marginBottom: 15,
+    marginTop: -5,
+  },
+  criteriaDetailItem: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  criteriaDetailItemActive: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#4A90D9',
+  },
+  criteriaDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 8,
+  },
+  criteriaDetailRange: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#4A90D9',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  criteriaDetailTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    flex: 1,
+  },
+  criteriaDetailTitleActive: {
+    color: '#1976D2',
+  },
+  currentLevelBadge: {
+    backgroundColor: '#4A90D9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  currentLevelBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  criteriaDetailBody: {
+    paddingLeft: 5,
+  },
+  criteriaDetailPoint: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  criteriaDetailBullet: {
+    fontSize: 13,
+    color: '#7F8C8D',
+    marginRight: 8,
+  },
+  criteriaDetailText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#5D6D7E',
+    lineHeight: 19,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#7F8C8D',
+    marginBottom: 15,
+    marginTop: -5,
+  },
+  turnFeedbackCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4A90D9',
+  },
+  turnFeedbackHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  turnNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  phaseBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  phaseBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1976D2',
+  },
+  userMessageBox: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 15,
+  },
+  userMessageLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#7F8C8D',
+    marginBottom: 6,
+  },
+  userMessageText: {
+    fontSize: 14,
+    color: '#2C3E50',
+    lineHeight: 20,
+  },
+  feedbackSection: {
+    marginBottom: 12,
+  },
+  feedbackSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 8,
+  },
+  feedbackPoint: {
+    flexDirection: 'row',
+    marginBottom: 6,
+    paddingLeft: 5,
+  },
+  feedbackBullet: {
+    fontSize: 14,
+    color: '#4A90D9',
+    marginRight: 8,
+    fontWeight: 'bold',
+  },
+  feedbackPointText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#5D6D7E',
+    lineHeight: 20,
+  },
+  specificExampleBox: {
+    backgroundColor: '#FFF9E6',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9800',
+  },
+  specificExampleTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 6,
+  },
+  specificExampleText: {
+    fontSize: 13,
+    color: '#5D6D7E',
+    lineHeight: 19,
   },
 });
 
