@@ -52,8 +52,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ navigation, route 
         // Judge Analyst + Learning Coach によるディベート評価
         const analysisResult: EvaluationAndFeedbackResult = await getEvaluationAndFeedback(
           transcript,
-          characterId,
-          messages
+          characterId
         );
         setResult(analysisResult.scores);
         setLearningCoachFeedback(analysisResult.feedback);

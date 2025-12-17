@@ -12,7 +12,7 @@
 
 import { Audio } from 'expo-av';
 import Constants from 'expo-constants';
-import { Character, CHARACTERS } from '../data/mockData';
+import { CHARACTERS } from '../data/mockData';
 
 // API設定
 const expoExtra = Constants.expoConfig?.extra;
@@ -122,9 +122,9 @@ export async function stopRecording(): Promise<string | null> {
  */
 export async function transcribeAudio(audioUri: string): Promise<string> {
   if (!OPENAI_API_KEY) {
-    console.log('[STT] API key not configured. Using placeholder text.');
-    await delay(500);
-    return '[APIキー未設定] .envファイルにOPENAI_API_KEYを設定すると音声認識が有効になります。';
+    const errorMsg = 'OpenAI APIキーが設定されていません。.envファイルにOPENAI_API_KEYを設定してください。';
+    console.error('[STT]', errorMsg);
+    throw new Error(errorMsg);
   }
 
   try {
@@ -166,30 +166,6 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
 // Debate Challenger Agent
 // =====================================
 
-// モック用テンプレート（Mastraサーバー未接続時のフォールバック）
-const CHARACTER_RESPONSE_TEMPLATES: { [key: string]: string[] } = {
-  sakura: [
-    'そうですね、この議題について考えると、いくつかの視点がありますね。私は別の角度から、まず基本的な点から整理してみましょう。',
-    'なるほど、そういう考え方もありますね。でも、別の角度から見てみると、違う結論も導けるかもしれません。',
-  ],
-  kenji: [
-    '論理的に考えると、この議題には3つの重要な論点があります。第一に、社会的影響。第二に、経済的効果。そして最後に、長期的な持続可能性。',
-    'その主張の論理構造を検証してみましょう。前提から結論への理由づけに、いくつかの飛躍があるように見えます。',
-  ],
-  yuki: [
-    '興味深いご意見ですが、データを見てみましょう。最新の研究によると、約65%の改善効果という結果が出ています。',
-    '統計的な観点から申し上げますと、70%の事例でこの傾向が確認されています。',
-  ],
-  takeshi: [
-    'その論点には致命的な欠陥があります。反証可能性という点を見落としていませんか？',
-    '反論させていただきます。あなたの主張は早まった一般化という議論のミスに陥っています。',
-  ],
-  tetsuo: [
-    'C-R-E-E-Pフレームワークで分析すると、あなたの主張にはEvidenceとExplanationの連携が弱いですね。',
-    '包括的に評価すると、この議論には効果性、実現可能性、倫理性の3次元で検討が必要です。',
-  ],
-};
-
 /**
  * 対戦エージェント（Debate Challenger）の応答生成
  * 直接OpenAI APIを呼び出す
@@ -213,7 +189,7 @@ export async function getChallengerResponse(
 }
 
 /**
- * 直接OpenAI APIを呼び出すフォールバック
+ * 直接OpenAI APIを呼び出す
  */
 async function getChallengerResponseDirect(
   transcript: string,
@@ -227,10 +203,9 @@ async function getChallengerResponseDirect(
   console.log('[Debate Challenger] API Key prefix:', OPENAI_API_KEY?.substring(0, 10) || 'N/A');
 
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 20) {
-    console.log('[Debate Challenger] API key not configured or invalid. Using mock response.');
-    await delay(2000);
-    const templates = CHARACTER_RESPONSE_TEMPLATES[charId] || CHARACTER_RESPONSE_TEMPLATES['sakura'];
-    return templates[Math.floor(Math.random() * templates.length)];
+    const errorMsg = 'OpenAI APIキーが設定されていません。.envファイルにOPENAI_API_KEYを設定してください。';
+    console.error('[Debate Challenger]', errorMsg);
+    throw new Error(errorMsg);
   }
 
   try {
@@ -240,7 +215,7 @@ async function getChallengerResponseDirect(
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `以下はこれまでの議論です。最後のユーザーの発言に対して反論してください。\n\n${transcript}` },
+        { role: 'user', content: transcript },
       ],
       max_tokens: 500,
       temperature: 0.8,
@@ -278,12 +253,7 @@ async function getChallengerResponseDirect(
     console.error('[Debate Challenger] Direct API error:', error?.message || error);
     console.error('[Debate Challenger] Error name:', error?.name);
     console.error('[Debate Challenger] Error stack:', error?.stack);
-
-    // ネットワークエラーの場合はモックを返す
-    console.log('[Debate Challenger] Falling back to mock response');
-    await delay(1000);
-    const templates = CHARACTER_RESPONSE_TEMPLATES[charId] || CHARACTER_RESPONSE_TEMPLATES['sakura'];
-    return templates[Math.floor(Math.random() * templates.length)];
+    throw error;
   }
 }
 
@@ -349,8 +319,9 @@ export async function getJudgeScore(
   console.log('[Judge Analyst] Evaluating debate...');
 
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 20) {
-    console.log('[Judge Analyst] API key not configured. Using fallback.');
-    return getJudgeScoreFallback(characterLevel);
+    const errorMsg = 'OpenAI APIキーが設定されていません。.envファイルにOPENAI_API_KEYを設定してください。';
+    console.error('[Judge Analyst]', errorMsg);
+    throw new Error(errorMsg);
   }
 
   try {
@@ -410,26 +381,9 @@ export async function getJudgeScore(
 
     throw new Error('Failed to parse scores from response');
   } catch (error) {
-    console.error('[Judge Analyst] API error, using fallback:', error);
-    return getJudgeScoreFallback(characterLevel);
+    console.error('[Judge Analyst] API error:', error);
+    throw error;
   }
-}
-
-/**
- * Judge Analystのフォールバック（モック生成）
- */
-function getJudgeScoreFallback(characterLevel: number): EvaluationScores {
-  const baseScore = 50;
-  const randomFactor = () => Math.random() * 30 - 15;
-  const difficultyPenalty = (characterLevel - 5) * 3;
-
-  return {
-    logic: clampScore(baseScore + randomFactor() - difficultyPenalty),
-    evidence: clampScore(baseScore + randomFactor() - difficultyPenalty),
-    tone: clampScore(baseScore + randomFactor() - difficultyPenalty),
-    refutation: clampScore(baseScore + randomFactor() - difficultyPenalty),
-    clarity: clampScore(baseScore + randomFactor() - difficultyPenalty),
-  };
 }
 
 // =====================================
@@ -451,8 +405,9 @@ export async function getCoachingFeedback(
   console.log('[Learning Coach] Generating feedback...');
 
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 20) {
-    console.log('[Learning Coach] API key not configured. Using fallback.');
-    return getCoachingFeedbackFallback(scores);
+    const errorMsg = 'OpenAI APIキーが設定されていません。.envファイルにOPENAI_API_KEYを設定してください。';
+    console.error('[Learning Coach]', errorMsg);
+    throw new Error(errorMsg);
   }
 
   try {
@@ -503,40 +458,9 @@ export async function getCoachingFeedback(
     console.log('[Learning Coach] Feedback generated, length:', feedback.length);
     return feedback;
   } catch (error) {
-    console.error('[Learning Coach] API error, using fallback:', error);
-    return getCoachingFeedbackFallback(scores);
+    console.error('[Learning Coach] API error:', error);
+    throw error;
   }
-}
-
-/**
- * Learning Coachのフォールバック（テンプレート生成）
- */
-function getCoachingFeedbackFallback(scores: EvaluationScores): string {
-  const axisNames: Record<string, string> = {
-    logic: '論理構造',
-    evidence: '証拠力',
-    tone: '話し方',
-    refutation: '反論力',
-    clarity: '構造化',
-  };
-
-  const contentMap: Record<string, string> = {
-    logic: 'C-R-E-E-Pフレームワーク',
-    evidence: 'C-R-E-E-Pフレームワーク',
-    tone: '敬意ある反対意見の表明',
-    refutation: 'ストローマン論法',
-    clarity: 'A-R-Eフレームワーク',
-  };
-
-  const entries = Object.entries(scores) as [keyof EvaluationScores, number][];
-  const lowest = entries.reduce((min, curr) => curr[1] < min[1] ? curr : min);
-  const [axis, score] = lowest;
-
-  if (score >= 70) {
-    return '素晴らしいディベートでした！全体的に高いスコアを維持しています。さらなる上達を目指して、より難しい相手に挑戦してみましょう。';
-  }
-
-  return `${axisNames[axis]}のスコアが${score}点と改善の余地があります。次は[学習]タブの「${contentMap[axis]}」を見直して、スキルアップを目指しましょう！`;
 }
 
 // =====================================
@@ -549,8 +473,7 @@ function getCoachingFeedbackFallback(scores: EvaluationScores): string {
  */
 export async function getEvaluationAndFeedback(
   debateLog: string,
-  characterId: string = 'sakura',
-  userMessages: string[] = []
+  characterId: string = 'sakura'
 ): Promise<EvaluationAndFeedbackResult> {
   const character = CHARACTERS.find(c => c.id === characterId);
   const characterLevel = character?.level || 5;
@@ -594,36 +517,15 @@ export async function getEvaluationAndFeedback(
 export const getAgentResponse = getChallengerResponse;
 export const analyzeDebate = async (
   transcript: string,
-  characterId: string,
-  userMessages: string[]
+  characterId: string
 ): Promise<EvaluationResult> => {
-  const result = await getEvaluationAndFeedback(transcript, characterId, userMessages);
+  const result = await getEvaluationAndFeedback(transcript, characterId);
   return result.scores;
 };
 
 // =====================================
 // ヘルパー関数
 // =====================================
-
-function buildChallengerPrompt(
-  transcript: string,
-  charId: string,
-  topicTitle?: string,
-  aiStance?: 'pro' | 'con'
-): string {
-  const stanceText = aiStance === 'pro' ? '賛成' : '反対';
-  const topicInfo = topicTitle
-    ? `【トピック】${topicTitle}\n【あなたの立場】${stanceText}\n\n`
-    : '';
-
-  const charInfo = getCharacterInfo(charId);
-
-  return `${charInfo}
-
-${topicInfo}以下はこれまでの議論です。最後のユーザーの発言に対して反論してください。
-
-${transcript}`;
-}
 
 function buildJudgePrompt(debateLog: string, characterLevel: number): string {
   return `以下のディベートログを評価し、ユーザーのパフォーマンスを5つの軸でスコア化してください。
@@ -679,17 +581,6 @@ ${debateLog}
 日本語で、励ましを含めた建設的なトーンで書いてください。`;
 }
 
-function getCharacterInfo(charId: string): string {
-  const charInfoMap: Record<string, string> = {
-    sakura: '【キャラクター】桜子サクラ（初級・穏やかで優しい）',
-    kenji: '【キャラクター】論理のケンジ（中級・論理的で冷静）',
-    yuki: '【キャラクター】証拠のユキ（中上級・データ重視）',
-    takeshi: '【キャラクター】反論のタケシ（上級・鋭く挑戦的）',
-    tetsuo: '【キャラクター】鉄人テツオ（最上級・多角的分析）',
-  };
-  return charInfoMap[charId] || charInfoMap['sakura'];
-}
-
 function getCharacterSystemPrompt(
   charId: string,
   topicTitle?: string,
@@ -721,9 +612,12 @@ function getCharacterSystemPrompt(
   return `${basePrompt}${topicInfo}
 
 【重要な指示】
-- ユーザーの主張に対して反証（反論）を行います。
-- 反論は具体的で論理的であるべきです。
-- 応答は2〜4文程度で簡潔にまとめてください。
+- あなたはディベートの対戦相手として、ユーザーと議論を行います。
+- ユーザーから提示される指示に従い、フェーズに応じた適切な応答をしてください。
+- 主張を述べる際は、明確な論拠と具体例を含めてください。
+- 反論する際は、相手の主張の弱点を指摘し、具体的な反証を提示してください。
+- あなたの立場（${stanceText}）を一貫して維持してください。
+- 応答は自然な会話形式で、読みやすい長さ（3〜6文程度）にしてください。
 - 日本語で応答してください。`;
 }
 
@@ -745,12 +639,4 @@ function generateFeedbackItems(scores: EvaluationScores): FeedbackItem[] {
       : `${config.name}は良好です。`,
     learnContentId: config.learnContentId,
   }));
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function clampScore(score: number): number {
-  return Math.round(Math.max(0, Math.min(100, score)));
 }
