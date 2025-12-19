@@ -22,6 +22,7 @@ export interface Character {
   clarity_bias: number;
   avatar: string;
   imageKey: string; // CHARACTER_IMAGESのキー
+  isPremium: boolean; // 課金が必要かどうか
 }
 
 export const CHARACTERS: Character[] = [
@@ -37,6 +38,7 @@ export const CHARACTERS: Character[] = [
     clarity_bias: 1.0,
     avatar: '🌸',
     imageKey: 'sakura',
+    isPremium: false, // 無料
   },
   {
     id: 'kenji',
@@ -50,6 +52,7 @@ export const CHARACTERS: Character[] = [
     clarity_bias: 1.1,
     avatar: '🧠',
     imageKey: 'kenji',
+    isPremium: true, // 課金必要
   },
   {
     id: 'yuki',
@@ -63,6 +66,7 @@ export const CHARACTERS: Character[] = [
     clarity_bias: 1.05,
     avatar: '📊',
     imageKey: 'yuki',
+    isPremium: true, // 課金必要
   },
   {
     id: 'takeshi',
@@ -76,6 +80,7 @@ export const CHARACTERS: Character[] = [
     clarity_bias: 1.0,
     avatar: '⚔️',
     imageKey: 'takeshi',
+    isPremium: true, // 課金必要
   },
   {
     id: 'tetsuo',
@@ -89,6 +94,7 @@ export const CHARACTERS: Character[] = [
     clarity_bias: 1.15,
     avatar: '🏆',
     imageKey: 'tetsuo',
+    isPremium: true, // 課金必要
   },
 ];
 

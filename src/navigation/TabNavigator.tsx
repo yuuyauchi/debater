@@ -10,6 +10,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import CharacterSelectScreen from '../screens/CharacterSelectScreen';
 import DebateScreen from '../screens/DebateScreen';
 import ResultsScreen from '../screens/ResultsScreen';
+import PurchaseScreen from '../screens/PurchaseScreen';
 
 // タイプ定義
 export type RootStackParamList = {
@@ -17,6 +18,7 @@ export type RootStackParamList = {
   CharacterSelect: undefined;
   Debate: { characterId: string; topicId: string; stance: 'pro' | 'con' };
   Results: { characterId: string; topicId: string; stance: 'pro' | 'con'; messages: string[] };
+  Purchase: undefined;
 };
 
 export type TabParamList = {
@@ -130,6 +132,15 @@ export const MainNavigator: React.FC = () => {
           title: '結果',
           headerShown: false,
           gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen
+        name="Purchase"
+        component={PurchaseScreen}
+        options={{
+          title: '課金',
+          headerShown: false,
+          presentation: 'modal',
         }}
       />
     </Stack.Navigator>

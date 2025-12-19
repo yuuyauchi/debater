@@ -12,12 +12,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CHARACTERS, TOPICS, Character, CHARACTER_IMAGES } from '../data/mockData';
+import { usePurchase } from '../context/PurchaseContext';
 
 type RootStackParamList = {
   MainTabs: undefined;
   CharacterSelect: undefined;
   Debate: { characterId: string; topicId: string; stance: 'pro' | 'con' };
   Results: { characterId: string; topicId: string; stance: 'pro' | 'con'; messages: string[] };
+  Purchase: undefined;
 };
 
 type CharacterSelectScreenProps = {
@@ -78,10 +80,33 @@ const CharacterImage: React.FC<{ imageKey: string; avatar: string }> = ({ imageK
 
 export const CharacterSelectScreen: React.FC<CharacterSelectScreenProps> = ({ navigation }) => {
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
+  const { isPurchased } = usePurchase();
+
+  const handleCharacterSelect = (character: Character) => {
+    // プレミアムキャラクターで課金していない場合、課金画面に誘導
+    if (character.isPremium && !isPurchased) {
+      Alert.alert(
+        'キャラクター解放',
+        `${character.name}は課金限定キャラクターです。\n全キャラクター解放（¥1,000）を購入しますか？`,
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          { text: '購入する', onPress: () => navigation.navigate('Purchase') },
+        ]
+      );
+      return;
+    }
+    setSelectedCharacter(character);
+  };
 
   const startDebate = () => {
     if (!selectedCharacter) {
       Alert.alert('エラー', '対戦相手を選択してください');
+      return;
+    }
+
+    // プレミアムキャラクターで課金していない場合、再確認
+    if (selectedCharacter.isPremium && !isPurchased) {
+      Alert.alert('エラー', 'このキャラクターは課金が必要です');
       return;
     }
 
@@ -118,20 +143,39 @@ export const CharacterSelectScreen: React.FC<CharacterSelectScreenProps> = ({ na
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {CHARACTERS.map((character) => (
-          <TouchableOpacity
-            key={character.id}
-            style={[
-              styles.characterCard,
-              selectedCharacter?.id === character.id && styles.selectedCard,
-            ]}
-            onPress={() => setSelectedCharacter(character)}
-            activeOpacity={0.7}
-          >
+        {CHARACTERS.map((character) => {
+          const isLocked = character.isPremium && !isPurchased;
+          return (
+            <TouchableOpacity
+              key={character.id}
+              style={[
+                styles.characterCard,
+                selectedCharacter?.id === character.id && styles.selectedCard,
+                isLocked && styles.lockedCard,
+              ]}
+              onPress={() => handleCharacterSelect(character)}
+              activeOpacity={0.7}
+            >
             <View style={styles.cardHeader}>
-              <CharacterImage imageKey={character.imageKey} avatar={character.avatar} />
+              <View style={styles.imageContainer}>
+                <CharacterImage imageKey={character.imageKey} avatar={character.avatar} />
+                {isLocked && (
+                  <View style={styles.lockOverlay}>
+                    <Text style={styles.lockIcon}>🔒</Text>
+                  </View>
+                )}
+              </View>
               <View style={styles.cardTitleSection}>
-                <Text style={styles.characterName}>{character.name}</Text>
+                <View style={styles.nameRow}>
+                  <Text style={[styles.characterName, isLocked && styles.lockedText]}>
+                    {character.name}
+                  </Text>
+                  {isLocked && (
+                    <View style={styles.premiumBadge}>
+                      <Text style={styles.premiumText}>課金限定</Text>
+                    </View>
+                  )}
+                </View>
                 <View style={styles.levelBadge}>
                   <View
                     style={[
@@ -144,13 +188,15 @@ export const CharacterSelectScreen: React.FC<CharacterSelectScreenProps> = ({ na
                   </Text>
                 </View>
               </View>
-              {selectedCharacter?.id === character.id && (
+              {selectedCharacter?.id === character.id && !isLocked && (
                 <View style={styles.checkmark}>
                   <Text style={styles.checkmarkText}>✓</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.description}>{character.description}</Text>
+            <Text style={[styles.description, isLocked && styles.lockedText]}>
+              {isLocked ? 'このキャラクターを使用するには課金が必要です' : character.description}
+            </Text>
 
             {/* 特徴バー */}
             <View style={styles.biasContainer}>
@@ -189,7 +235,8 @@ export const CharacterSelectScreen: React.FC<CharacterSelectScreenProps> = ({ na
               </View>
             </View>
           </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -252,6 +299,9 @@ const styles = StyleSheet.create({
     borderColor: '#4A90D9',
     backgroundColor: '#F0F7FF',
   },
+  lockedCard: {
+    opacity: 0.6,
+  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -261,6 +311,21 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     marginRight: 12,
+    position: 'relative',
+  },
+  lockOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockIcon: {
+    fontSize: 24,
   },
   characterImage: {
     width: 60,
@@ -288,11 +353,30 @@ const styles = StyleSheet.create({
   cardTitleSection: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   characterName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2C3E50',
-    marginBottom: 4,
+    marginRight: 8,
+  },
+  premiumBadge: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  premiumText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  lockedText: {
+    color: '#95A5A6',
   },
   levelBadge: {
     flexDirection: 'row',
