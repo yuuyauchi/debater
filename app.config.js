@@ -1,8 +1,5 @@
+// app.config.js
 import 'dotenv/config';
-
-// Debug: 環境変数の読み込み確認
-console.log('[app.config.js] OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
-console.log('[app.config.js] OPENAI_API_KEY length:', process.env.OPENAI_API_KEY?.length || 0);
 
 export default {
   expo: {
@@ -20,10 +17,10 @@ export default {
     },
     ios: {
       supportsTablet: true,
+      buildNumber: '2', // ← ビルド番号アップ
+      bundleIdentifier: 'com.yauchiyuu.debaterapp',
       infoPlist: {
-        NSAppTransportSecurity: {
-          NSAllowsArbitraryLoads: true,
-        },
+        ITSAppUsesNonExemptEncryption: false, // ← 追加！
       },
     },
     android: {
@@ -33,13 +30,16 @@ export default {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      usesCleartextTraffic: true,
     },
     web: {
       favicon: './assets/favicon.png',
     },
     extra: {
-      openaiApiKey: process.env.OPENAI_API_KEY,
+      // 環境変数を使っているならここで渡す
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      eas: {
+        projectId: '6fd30a00-dbcf-424a-883b-8ed092051206', // ← ログに出ていた projectId
+      },
     },
   },
 };
