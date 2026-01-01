@@ -8,12 +8,17 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  Linking,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/TabNavigator';
 import { useUser } from '../context/UserContext';
+
+type SettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const SettingsScreen: React.FC = () => {
   const { resetUser } = useUser();
+  const navigation = useNavigation<SettingsScreenNavigationProp>();
   const [darkMode, setDarkMode] = React.useState(false);
 
   const handleResetData = () => {
@@ -35,45 +40,15 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleTermsPress = () => {
-    Alert.alert(
-      '利用規約',
-      '利用規約ページは準備中です。',
-      [{ text: 'OK' }]
-    );
+    navigation.navigate('Terms');
   };
 
   const handlePrivacyPress = () => {
-    Alert.alert(
-      'プライバシーポリシー',
-      'プライバシーポリシーページは準備中です。',
-      [{ text: 'OK' }]
-    );
+    navigation.navigate('Privacy');
   };
 
   const handleEnquiryPress = () => {
-    const email = 'yuuyauchi1998@gmail.com';
-    const subject = 'Debate Dojoお問い合わせ';
-    const url = `mailto:${email}?subject=${encodeURIComponent(subject)}`;
-    
-    Linking.canOpenURL(url)
-      .then((supported) => {
-        if (supported) {
-          return Linking.openURL(url);
-        } else {
-          Alert.alert(
-            'エラー',
-            'メールアプリを開けませんでした。',
-            [{ text: 'OK' }]
-          );
-        }
-      })
-      .catch(() => {
-        Alert.alert(
-          'エラー',
-          'メールアプリを開けませんでした。',
-          [{ text: 'OK' }]
-        );
-      });
+    navigation.navigate('Contact');
   };
 
   return (

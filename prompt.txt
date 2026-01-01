@@ -1,46 +1,82 @@
-追加機能として課金機能の実装を考えており、以下のマークダウンに従う形で実装を進めようとしています。
-しかし、課金によってユーザーが得られるのは他のキャラクターとの対戦機会のみなので、もっとユーザーが買いたくなるように付加価値をつけたいと考えています。
-例えば以下のような形です。
- - ディベートのテーマが選べる
- - ディベートの賛成・反対のスタンス選択可能
- - ログイン機能の実装によるログ記録、成長の監視、全国ランキング機能表示
- - ユーザーが提示したテーマでディベートができる
+以下審査のメールが来ました。現在修正を加えたのですが、以下の指摘が直っているか確認して欲しいです。
 
-他にも便利な機能をつけたいと思っているのですが、どんなものが考えられるか提案して欲しいです。
-相談相手になってください。
+Hello,
 
-## 概要
-アプリに課金機能を追加し、キャラクターの解放システムを実装する。
+Thank you for your resubmission. Upon further review, we identified additional issues that need your attention. See below for more information.
 
-## 仕様
+If you have any questions, we are here to help. Reply to this message in App Store Connect and let us know.
 
-### 無料機能
-- 桜子（さくら）とのディベート対戦が無料で利用可能
-- 基本的なディベート機能は全て利用可能
 
-### 課金機能
-- 他のキャラクター（健二、雪、武、鉄男）との対戦を解放
-- 課金方法の検討が必要（買い切り、サブスクリプション、キャラクター個別購入など）
+Review Environment
 
-## 実装検討項目
+Submission ID: 6dbfcdae-2921-4e4a-9398-8a7ea758d25c
+Review date: December 30, 2025
+Review Device: iPad Air 11-inch (M3)
+Version reviewed: 1.0
 
-### 技術面
-- [ ] 課金システムの選定（App Store / Google Play In-App Purchase）
-- [ ] 課金状態の管理
-- [ ] キャラクター解放状態の保存
-- [ ] 課金復元機能
 
-### UI/UX
-- [ ] キャラクター選択画面での鍵アイコン表示
-- [ ] 課金案内画面のデザイン
-- [ ] 購入フローの設計
+Guideline 2.1 - Performance - App Completeness
+Issue Description
 
-### ビジネスモデル
-- [ ] 価格設定
-- [ ] 課金方式の決定
-  - オプション1: 全キャラクター解放（買い切り）
-  - オプション2: キャラクター個別購入
-  - オプション3: サブスクリプション
+The app exhibited one or more bugs that would negatively impact users.
 
-## 優先度
-高（収益化のための重要機能）
+Bug description: 
+
+- When we tapped on Terms & Conditions/Privacy Policy/Enquiry buttons were not responsive.
+
+Review device details:
+
+- Device type: iPad Air 11-inch (M3) 
+- OS version: iPadOS 26.2
+
+Next Steps
+
+Test the app on supported devices to identify and resolve bugs and stability issues before submitting for review.
+
+If the bug cannot be reproduced, try the following:
+
+- For new apps, uninstall all previous versions of the app from a device, then install and follow the steps to reproduce.
+- For app updates, install the new version as an update to the previous version, then follow the steps to reproduce.
+
+Resources
+
+- For information about testing apps and preparing them for review, see Testing a Release Build.
+- To learn about troubleshooting networking issues, see Networking Overview.
+
+
+
+Guideline 4.0 - Design
+
+We continued to notice that there is an issue in the app that contributes to a lower-quality user experience than App Store users expect:
+
+- The app's permissions requests are not written in the same language as the app's Japanese localization. To help users understand why the app is requesting access to a specific feature, the app's permission requests should be in the same language as the app's current localization.
+
+Please refer the attached screenshot.
+
+Next Steps
+
+Revise the app to address all instances of the issue identified above.
+
+Resources
+
+- To learn more about App Store design requirements, see App Review Guideline 4 - Design. 
+- Learn foundational design principles from Apple designers and the developer community.
+- Visit Accessibility on iOS to learn more about delivering a superior mobile experience to every customer.
+- Learn more about designing for iOS in the Human Interface Guidelines.
+
+
+Guideline 5.1.1 - Legal - Privacy - Data Collection and Storage
+Issue Description
+
+One or more purpose strings in the app do not sufficiently explain the use of protected resources. Purpose strings must clearly and completely describe the app's use of data and, in most cases, provide an example of how the data will be used.
+
+Next Steps
+
+Update the microphone purpose string to explain how the app will use the requested information and provide a specific example of how the data will be used. See the attached screenshot.
+
+Resources
+
+Purpose strings must clearly describe how an app uses the ability, data, or resource. The following are hypothetical examples of unclear purpose strings that would not pass review: 
+
+- "App would like to access your Contacts"
+- "App needs microphone access"

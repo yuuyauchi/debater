@@ -11,6 +11,9 @@ import CharacterSelectScreen from '../screens/CharacterSelectScreen';
 import DebateScreen from '../screens/DebateScreen';
 import ResultsScreen from '../screens/ResultsScreen';
 import PurchaseScreen from '../screens/PurchaseScreen';
+import TermsScreen from '../screens/TermsScreen';
+import PrivacyScreen from '../screens/PrivacyScreen';
+import ContactScreen from '../screens/ContactScreen';
 
 // タイプ定義
 export type RootStackParamList = {
@@ -19,6 +22,9 @@ export type RootStackParamList = {
   Debate: { characterId: string; topicId: string; stance: 'pro' | 'con' };
   Results: { characterId: string; topicId: string; stance: 'pro' | 'con'; messages: string[] };
   Purchase: undefined;
+  Terms: undefined;
+  Privacy: undefined;
+  Contact: undefined;
 };
 
 export type TabParamList = {
@@ -141,6 +147,27 @@ export const MainNavigator: React.FC = () => {
           title: '課金',
           headerShown: false,
           presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="Terms"
+        component={TermsScreen}
+        options={{
+          title: '利用規約',
+        }}
+      />
+      <Stack.Screen
+        name="Privacy"
+        component={PrivacyScreen}
+        options={{
+          title: 'プライバシーポリシー',
+        }}
+      />
+      <Stack.Screen
+        name="Contact"
+        component={ContactScreen}
+        options={{
+          title: 'お問い合わせ',
         }}
       />
     </Stack.Navigator>
