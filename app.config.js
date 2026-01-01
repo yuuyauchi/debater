@@ -17,10 +17,12 @@ export default {
     },
     ios: {
       supportsTablet: true,
-      buildNumber: '2', // ← ビルド番号アップ
+      buildNumber: '4', // ← ビルド番号アップ
       bundleIdentifier: 'com.yauchiyuu.debaterapp',
       infoPlist: {
-        ITSAppUsesNonExemptEncryption: false, // ← 追加！
+        ITSAppUsesNonExemptEncryption: false,
+        NSMicrophoneUsageDescription:
+          'このアプリはディベート練習のために音声を録音します。マイクを使用して、あなたの議論を音声で入力し、AIがそれを評価してフィードバックを提供します。例えば、「環境保護について」とディベートする際に、あなたの意見を音声で入力できます。',
       },
     },
     android: {

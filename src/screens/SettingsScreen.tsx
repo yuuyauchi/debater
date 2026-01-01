@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Linking,
 } from 'react-native';
 import { useUser } from '../context/UserContext';
 
@@ -31,6 +32,48 @@ export const SettingsScreen: React.FC = () => {
         },
       ]
     );
+  };
+
+  const handleTermsPress = () => {
+    Alert.alert(
+      '利用規約',
+      '利用規約ページは準備中です。',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handlePrivacyPress = () => {
+    Alert.alert(
+      'プライバシーポリシー',
+      'プライバシーポリシーページは準備中です。',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleEnquiryPress = () => {
+    const email = 'yuuyauchi1998@gmail.com';
+    const subject = 'Debate Dojoお問い合わせ';
+    const url = `mailto:${email}?subject=${encodeURIComponent(subject)}`;
+    
+    Linking.canOpenURL(url)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(url);
+        } else {
+          Alert.alert(
+            'エラー',
+            'メールアプリを開けませんでした。',
+            [{ text: 'OK' }]
+          );
+        }
+      })
+      .catch(() => {
+        Alert.alert(
+          'エラー',
+          'メールアプリを開けませんでした。',
+          [{ text: 'OK' }]
+        );
+      });
   };
 
   return (
@@ -164,17 +207,17 @@ export const SettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>サポート</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.linkItem}>
+            <TouchableOpacity style={styles.linkItem} onPress={handleTermsPress}>
               <Text style={styles.linkText}>利用規約</Text>
               <Text style={styles.linkArrow}>→</Text>
             </TouchableOpacity>
             <View style={styles.divider} />
-            <TouchableOpacity style={styles.linkItem}>
+            <TouchableOpacity style={styles.linkItem} onPress={handlePrivacyPress}>
               <Text style={styles.linkText}>プライバシーポリシー</Text>
               <Text style={styles.linkArrow}>→</Text>
             </TouchableOpacity>
             <View style={styles.divider} />
-            <TouchableOpacity style={styles.linkItem}>
+            <TouchableOpacity style={styles.linkItem} onPress={handleEnquiryPress}>
               <Text style={styles.linkText}>お問い合わせ</Text>
               <Text style={styles.linkArrow}>→</Text>
             </TouchableOpacity>
